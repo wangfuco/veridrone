@@ -20,14 +20,4 @@ logic/EnabledLemmas.v
 logic/Stability.v
 logic/LyapunovFunctions.v
 
-examples/DiffEqSolutions.v
-examples/System.v
-examples/Quadcopter.v
-examples/Velocity.v
-examples/Position.v
-examples/UtilPosition.v
-examples/Interval.v
-examples/Rectangle.v
-examples/Cuboid.v
-examples/FourCuboids.v
-examples/FirstOrderStability.v
+examples/P.v 
