@@ -1,7 +1,7 @@
 Require Import Coq.Reals.Rdefinitions.
 Require Import Coq.Reals.RIneq.
 Require Import Coq.micromega.Psatz.
-Require Import SMTC.Tactic.
+(* Require Import SMTC.Tactic. *)
 Require Import Logic.Syntax.
 Require Import Logic.Semantics.
 Require Import Logic.Lib.
@@ -238,6 +238,7 @@ Ltac R_simplify :=
    z3 on real arithmetic goals. At the
    moment, you have to look in the *coq*
    buffer for the output. *)
+(*  
 Ltac z3_prepare :=
   intros.
 
@@ -246,6 +247,7 @@ Ltac z3_solve :=
 
 Ltac z3_quick :=
   z3_prepare; smt solve.
+*)
 
 (* rewrites the values of variables in the next
    state into hypothesis and goals. *)

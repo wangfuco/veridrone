@@ -1,10 +1,14 @@
+Require Import Coq.Lists.List.
 Require Import Coq.Reals.Rdefinitions.
+Require Import Coq.Reals.RIneq.
 Require Import Logic.Logic.
-Import LibNotations.
+(* Import LibNotations. *)
 Require Import Logic.DifferentialInduction.
 Require Import Logic.ContinuousProofRules.
-Require Import ChargeTactics.Lemmas.
+Require Import ChargeCore.Tactics.Lemmas.
 Require Import ArithFacts.
+
+Require Import Examples.System.
 
 Open Scope string_scope.
 Open Scope HP_scope.
@@ -14,18 +18,33 @@ Section P.
   Variable d : R.
   Hypothesis d_gt_0 : (d > 0)%R.
 
-  Definition World : Formula :=
-    Continuous (["x"' ::= "v", "v"' ::= 0, "t"' ::= --1]).
+  (*Definition World : Formula :=
+    Continuous (["x"' ::= "v", "v"' ::= 0, "t"' ::= --1]).*)
+  (*Definition w : state->Formula :=
+    fun st' =>
+      st' "x" = "v" //\\ st' "v" = 0 //\\ st' "t" = --1 //\\
+      "t" >= 0.*)
+
+  Definition w : Evolution :=
+    fun st' =>
+      st' "x" = "v" //\\ st' "v" = 0.
+  
+
+  (*Definition Ctrl : Formula :=
+    "v"! = --"x"/d //\\ Unchanged (["x", "t"]).*)
 
   Definition Ctrl : Formula :=
-    "v"! = --"x"/d //\\ Unchanged (["x", "t"]).
+    "v"! = --"x"/d //\\ Unchanged ("x"::nil).
 
   Definition Init : Formula :=
-    "v" = --"x"/d //\\ "t" <= d.
+    "v" = --"x"/d //\\ "T" <= d.
 
-  Definition Next : Formula :=
+  (*Definition Next : Formula :=
     (World \\// (Ctrl //\\ "t"! <= d)) //\\
-    "t" >= 0.
+    "t" >= 0.*)
+
+  Definition Next : ActionFormula :=
+    Sys (Ctrl //\\ "T" <= d) w d.
 
   Definition Spec : Formula :=
     Init //\\ []Next.
@@ -46,11 +65,11 @@ Section P.
                   apply lorL ].
 
   Definition IndInv : Formula :=
-    ("v" < 0 -->> --"v"*"t" <= "x") //\\
-    ("v" >= 0 -->> "v"*"t" <= --"x").
+    ("v" < 0 -->> --"v"*"T" <= "x") //\\
+    ("v" >= 0 -->> "v"*"T" <= --"x").
 
   Lemma indinv_direction :
-    IndInv //\\ "t" >= 0 |-- "v"*"x" <= 0.
+    IndInv //\\ "T" >= 0 |-- "v"*"x" <= 0.
   Proof.
     solve_nonlinear.
   Qed.
@@ -64,7 +83,7 @@ Section P.
     + unfold Spec. charge_tauto.
     + unfold Spec, IndInv, Init.
       charge_split.
-      { unfold Next. rewrite landC. tlaRevert.
+      { unfold Next, Sys, Discr. rewrite landC. tlaRevert.
         rewrite BasicProofRules.Always_now.
         2: charge_assumption.
         tlaRevert. apply forget_prem. charge_intros.
@@ -72,32 +91,29 @@ Section P.
         { solve_linear. rewrite H0.
           rewrite Raxioms.Rmult_assoc.
           rewrite <- RIneq.Rinv_l_sym;
-            solve_linear. }
+            solve_linear.
+          rewrite H0.
+          rewrite Raxioms.Rmult_assoc.
+          rewrite <- RIneq.Rinv_l_sym;
+            solve_linear.  }
         { solve_nonlinear. } }
-      { unfold Next. rewrite landC. tlaRevert.
+      { unfold Next, Sys, Discr. rewrite landC. tlaRevert.
         rewrite BasicProofRules.Always_now.
         2: charge_assumption.
         tlaRevert. apply forget_prem. charge_intros.
         tlaAssert ("v"*d = --"x").
         { solve_linear. rewrite H0.
+          rewrite Raxioms.Rmult_assoc.
+          rewrite <- RIneq.Rinv_l_sym;
+            solve_linear.
+          rewrite H0.
           rewrite Raxioms.Rmult_assoc.
           rewrite <- RIneq.Rinv_l_sym;
             solve_linear. }
         { solve_nonlinear. } }
     + unfold Next.
-      decompose_hyps.
-      * unfold World.
-        eapply diff_ind with (Hyps:=ltrue).
-        { tlaIntuition. }
-        { tlaIntuition. }
-        { charge_tauto. }
-        { charge_tauto. }
-        { charge_tauto. }
-        { charge_tauto. }
-        { repeat tlaSplit;
-          try solve [solve_linear |
-                     tlaIntro; eapply unchanged_continuous;
-                     [ tlaAssume | solve_linear ] ]. }
+      unfold Sys. decompose_hyps.
+
       * simpl. restoreAbstraction. charge_split.
         { solve_linear. rewrite_next_st.
           repeat rewrite RIneq.Rminus_0_l.
@@ -118,6 +134,30 @@ Section P.
             { solve_linear. }
             { clear d_gt_0. solve_nonlinear. } }
           { solve_nonlinear. } }
+
+      * unfold World.
+        eapply diff_ind with (Hyps:=ltrue).
+        { tlaIntuition. }
+        { tlaIntuition. }
+        { charge_tauto. }
+        { tlaIntuition. }
+        { charge_tauto. }
+        { charge_tauto. }
+        { repeat tlaSplit;
+          try solve [solve_linear |
+                     tlaIntro; eapply unchanged_continuous;
+                     [ tlaAssume | solve_linear ] ]. }
+        { simpl deriv_formula. restoreAbstraction.
+          charge_intros.
+          unfold lift2, mkEvolution, w.
+          repeat charge_split; charge_intros;
+          try solve [ solve_linear
+                    | eapply zero_deriv with (x:="v");
+                      [ charge_tauto | tlaIntuition |
+                        solve_linear ] ].
+          solve_nonlinear.
+          solve_nonlinear.
+          }
   Qed.
 
 (*
@@ -153,10 +193,12 @@ Section P.
         with (A:=IndInv //\\ Next //\\ BasicProofRules.next IndInv).
         + tlaIntuition.
         + unfold Spec. repeat rewrite <- BasicProofRules.Always_and.
+           
           admit.
         + charge_tauto.
-        + unfold Next. simpl BasicProofRules.next.
+        + unfold Next, Sys. simpl BasicProofRules.next.
           restoreAbstraction. decompose_hyps.
+          * solve_linear. 
           * unfold World.
             tlaAssert ("v"! < 0 \\// "v"! >= 0);
               [ solve_linear | ].
@@ -166,34 +208,53 @@ Section P.
                 - tlaIntuition.
                 - tlaIntuition.
                 - charge_tauto.
-                - eapply unchanged_continuous.
+                - tlaIntuition.
+                - eapply zero_deriv with (x:="v").
                   * charge_tauto.
                   * solve_linear.
-                - eapply unchanged_continuous.
-                  * charge_tauto.
-                  * solve_linear.
-                - eapply unchanged_continuous.
-                  * charge_tauto.
                   * solve_linear.
                 - solve_linear.
-              + solve_nonlinear. }
+                - unfold mkEvolution, w.
+                  repeat charge_split; charge_intros;
+                  try solve [ solve_linear
+                            | eapply zero_deriv with (x:="v");
+                              [ charge_tauto | tlaIntuition |
+                                solve_linear ] ].
+                - simpl deriv_formula. restoreAbstraction.
+                  charge_intros.
+                  unfold mkEvolution, w.
+                  repeat charge_split; charge_intros;
+                  try solve [ solve_linear
+                            | eapply zero_deriv with (x:="v");
+                              [ charge_tauto | tlaIntuition |
+                                solve_linear ] ].
+              + admit. }
             { charge_split; charge_intros.
-              + solve_nonlinear.
+              + admit.
               + eapply diff_ind with (Hyps:="v" >= 0) (G:=--"x" < x).
                 - tlaIntuition.
                 - tlaIntuition.
                 - charge_tauto.
-                - eapply unchanged_continuous.
+                - tlaIntuition.
+                - eapply zero_deriv with (x:="v").
                   * charge_tauto.
                   * solve_linear.
-                - eapply unchanged_continuous.
-                  * charge_tauto.
                   * solve_linear.
-                - eapply unchanged_continuous.
-                  * charge_tauto.
-                  * solve_linear.
-                - solve_linear. }
-          * solve_linear. }
+                - solve_linear.
+                - unfold mkEvolution, w.
+                  repeat charge_split; charge_intros;
+                  try solve [ solve_linear
+                            | eapply zero_deriv with (x:="v");
+                              [ charge_tauto | tlaIntuition |
+                                solve_linear ] ].
+                - simpl deriv_formula. restoreAbstraction.
+                  charge_intros.
+                  unfold mkEvolution, w.
+                  repeat charge_split; charge_intros;
+                  try solve [ solve_linear
+                            | eapply zero_deriv with (x:="v");
+                              [ charge_tauto | tlaIntuition |
+                                solve_linear ] ]. }
 Qed.
 
 End P.
