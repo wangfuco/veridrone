@@ -1,47 +1,45 @@
 Require Import Coq.Lists.List.
 Require Import Coq.Reals.Rdefinitions.
 Require Import Coq.Reals.RIneq.
+Require Import Coq.Reals.Rtrigo_def.
 Require Import Logic.Logic.
-(* Import LibNotations. *)
+
 Require Import Logic.DifferentialInduction.
 Require Import Logic.ContinuousProofRules.
 Require Import ChargeCore.Tactics.Lemmas.
 Require Import ArithFacts.
 
+Require Import Logic.BasicProofRules.
+
 Require Import Examples.System.
+
 
 Open Scope string_scope.
 Open Scope HP_scope.
 
-Section P.
+
+Section test_1ssp.
 
   Variable d : R.
+  Variable a : R.
+  Variable b : R.
+  Variable kP : R.
+  Variable x0 : R.
   Hypothesis d_gt_0 : (d > 0)%R.
-
-  (*Definition World : Formula :=
-    Continuous (["x"' ::= "v", "v"' ::= 0, "t"' ::= --1]).*)
-  (*Definition w : state->Formula :=
-    fun st' =>
-      st' "x" = "v" //\\ st' "v" = 0 //\\ st' "t" = --1 //\\
-      "t" >= 0.*)
+  (* Hypothesis a_neq_0 : (a =/= 0)%R.
+  Hypothesis kP_bound : (0 < ((1-b/a*kP)* 
+    eval_term exp(a*d) _ _
+    +b/a*kP) < 1)%R.  *)
 
   Definition w : Evolution :=
     fun st' =>
-      st' "x" = "v" //\\ st' "v" = 0.
-  
-
-  (*Definition Ctrl : Formula :=
-    "v"! = --"x"/d //\\ Unchanged (["x", "t"]).*)
+      st' "x" = a * "x" //\\ st' "t" = 1.
 
   Definition Ctrl : Formula :=
-    "v"! = --"x"/d //\\ Unchanged ("x"::nil).
+    "T"! = d //\\ Unchanged ("x"::"t"::nil).
 
   Definition Init : Formula :=
-    "v" = --"x"/d //\\ "T" <= d.
-
-  (*Definition Next : Formula :=
-    (World \\// (Ctrl //\\ "t"! <= d)) //\\
-    "t" >= 0.*)
+    "x"=x0 //\\ "T" = d //\\ "t" = 0.
 
   Definition Next : ActionFormula :=
     Sys (Ctrl //\\ "T" <= d) w d.
@@ -51,6 +49,64 @@ Section P.
 
   Definition Abs (t : Term) (f : Term -> Formula) : Formula :=
     (t > 0 -->> f t) //\\ (t <= 0 -->> f (--t)).
+
+  Lemma trivial_test_exp :
+    |-- exp(0)=1.
+  Proof.
+    breakAbstraction. intros. apply exp_0.
+  Qed.
+
+  Lemma exp0_testR :
+    |-- forall a : R , a-a=0.
+  Proof.
+    breakAbstraction. intros.
+  Admitted.
+  
+  Lemma test :
+    Continuous w
+    |-- Exists x : R, "x" = x //\\
+      Exists t : R, "t" = t //\\
+                    "x"! = x * exp(a*"t"! - a*t) //\\
+                    "t"! >= t.
+  Proof.
+    apply Exists_with_st with (t:="x"). intros.
+    charge_intros. charge_split; [ charge_tauto | ].
+    apply Exists_with_st with (t:="t"). intros.
+    charge_intros. charge_split; [ charge_tauto | ].
+    match goal with
+      |- _ |-- ?GG => eapply diff_ind
+                      with (Hyps:=TRUE)
+                             (G:=unnext GG)
+    end.
+    + tlaIntuition.
+    + tlaIntuition.
+    + charge_tauto.
+    + tlaIntuition.
+    + charge_tauto.
+    + solve_linear. rewrite -> H1. rewrite -> H2.
+      assert(exp (a*x1-a*x1)=1%R).
+      - admit.
+      - rewrite H0. solve_linear.
+    + tlaIntuition.
+    + solve_linear. rewrite H2. rewrite H1. admit.
+    Admitted.
+    
+  
+(*  
+  Lemma test_exp : 
+    |-- Spec -->> []("x"=x0*exp(a*"t")).
+  Proof.
+    charge_intros.
+    eapply BasicProofRules.discr_indX.
+    + tlaIntuition.
+    + unfold Spec. charge_tauto.
+    + unfold Spec, Init, Next.
+      rewrite BasicProofRules.Always_now.
+      2: charge_assumption.
+      unfold Sys, Ctrl, w, World.
+      solve_linear.
+      - rewrite H4.
+*)
 
   Definition Stable x : Formula :=
     Forall a : R,
@@ -160,7 +216,25 @@ Section P.
           }
   Qed.
 
-
+(*
+  Lemma indinv_stable :
+    |-- []IndInv -->> Stable "x".
+  Proof.
+    unfold Stable. charge_intros.
+    eapply lexistsR. instantiate (1:=x).
+    charge_split.
+    + charge_tauto.
+    + charge_intros.
+      tlaAssert ([]IndInv).
+      * charge_tauto.
+      * apply forget_prem. apply BasicProofRules.always_imp.
+        unfold IndInv, Abs. charge_intros. charge_split; charge_intros.
+        - tlaAssert ("v" < 0 \\// "v" >= 0);
+          [ solve_linear | charge_intros ].
+          decompose_hyps.
+          { solve_linear. clear H3. z3 solve_dbg.
+     *)   
+          
   Lemma spec_stable :
     |-- Spec -->> Stable "x".
   Proof.
@@ -175,15 +249,8 @@ Section P.
         with (A:=IndInv //\\ Next //\\ BasicProofRules.next IndInv).
         + tlaIntuition.
         + unfold Spec. repeat rewrite <- BasicProofRules.Always_and.
-          repeat charge_split.
-          * charge_tauto.
-          * charge_tauto.
-          * tlaRevert. tlaRevert. tlaRevert. apply forget_prem. charge_intros.
-            rewrite landC. tlaRevert. apply forget_prem. charge_intros.
-            rewrite landC. tlaRevert. apply forget_prem. charge_intros.
-(*             eapply BasicProofRules.always_st with (Q:=IndInv). *)
-
-            admit.
+           
+          admit.
         + charge_tauto.
         + unfold Next, Sys. simpl BasicProofRules.next.
           restoreAbstraction. decompose_hyps.
@@ -217,9 +284,9 @@ Section P.
                             | eapply zero_deriv with (x:="v");
                               [ charge_tauto | tlaIntuition |
                                 solve_linear ] ].
-              + solve_nonlinear. }
+              + admit. }
             { charge_split; charge_intros.
-              + solve_nonlinear.
+              + admit.
               + eapply diff_ind with (Hyps:="v" >= 0) (G:=--"x" < x).
                 - tlaIntuition.
                 - tlaIntuition.
@@ -244,9 +311,8 @@ Section P.
                             | eapply zero_deriv with (x:="v");
                               [ charge_tauto | tlaIntuition |
                                 solve_linear ] ]. }
-(* Qed.
- *)
-Admitted.
+Qed.
+
 End P.
 
 Close Scope string_scope.

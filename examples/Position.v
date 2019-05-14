@@ -5,8 +5,8 @@ Require Import Logic.Logic.
 Require Import Logic.ProofRules.
 Require Import Logic.ArithFacts.
 Require Import Examples.System.
-Require Import Examples.UtilPosition.
-Require Import Examples.DiffEqSolutions.
+(*Require Import Examples.UtilPosition.
+Require Import Examples.DiffEqSolutions.*)
 
 Open Scope HP_scope.
 Open Scope string_scope.
