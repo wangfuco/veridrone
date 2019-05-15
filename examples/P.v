@@ -181,9 +181,8 @@ Section P.
           * tlaRevert. tlaRevert. tlaRevert. apply forget_prem. charge_intros.
             rewrite landC. tlaRevert. apply forget_prem. charge_intros.
             rewrite landC. tlaRevert. apply forget_prem. charge_intros.
-(*             eapply BasicProofRules.always_st with (Q:=IndInv). *)
-
-            admit.
+            etransitivity; [ eapply BasicProofRules.always_st | ].
+            tlaIntuition. rewrite <- BasicProofRules.Always_and. charge_tauto.
         + charge_tauto.
         + unfold Next, Sys. simpl BasicProofRules.next.
           restoreAbstraction. decompose_hyps.
@@ -244,9 +243,11 @@ Section P.
                             | eapply zero_deriv with (x:="v");
                               [ charge_tauto | tlaIntuition |
                                 solve_linear ] ]. }
-(* Qed.
- *)
-Admitted.
+    }
+
+Qed.
+
+
 End P.
 
 Close Scope string_scope.
